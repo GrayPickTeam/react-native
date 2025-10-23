@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 interface Props {
@@ -39,6 +39,21 @@ const WebviewScreen = ({ uri }: Props) => {
     }
   };
 
+  const handleClosePopup = () => {
+    // RN에서 팝업 닫기
+    setPopupUrl(null);
+
+    // 웹 쪽에서도 window.close() 호출 시도 (있으면 동작)
+    try {
+      mainWebViewRef.current?.injectJavaScript(`
+        try { window.close && window.close(); } catch(e) {}
+        true;
+      `);
+    } catch (e) {
+      // noop
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* 메인 WebView */}
@@ -56,19 +71,36 @@ const WebviewScreen = ({ uri }: Props) => {
       {popupUrl && (
         <View style={styles.popupOverlay}>
           <View style={styles.popupContainer}>
+            {/* 닫기 버튼 */}
+            <Pressable
+              style={styles.closeButton}
+              onPress={handleClosePopup}
+              hitSlop={8}
+            >
+              <Text style={styles.closeText}>✕</Text>
+            </Pressable>
+
             <WebView
               source={{ uri: popupUrl }}
               javaScriptEnabled
               domStorageEnabled
-              onNavigationStateChange={(navState) => {
+              onNavigationStateChange={navState => {
                 const url = navState.url;
 
-                // ✅ redirect URI 감지 (예시: /api/auth/callback)
+                // ✅ redirect URI 감지
                 if (url.includes('/api/auth/callback')) {
                   const match = url.match(/[?&]code=([^&]+)/);
                   if (match) {
                     const code = decodeURIComponent(match[1]);
-                    Alert.alert('OAuth code', code);
+
+                    // ✅ code를 Next.js로 전달
+                    mainWebViewRef.current?.injectJavaScript(`
+                      window.postMessage(${JSON.stringify(
+                        JSON.stringify({ type: 'OAUTH_CODE', code }),
+                      )}, "*");
+                      true;
+                    `);
+
                     setPopupUrl(null);
                   }
                 }
@@ -111,5 +143,23 @@ const styles = StyleSheet.create({
   },
   popup: {
     flex: 1,
+  },
+  closeButton: {
+    display: 'flex',
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeText: {
+    color: 'white',
+    fontSize: 18,
+    lineHeight: 18,
   },
 });
