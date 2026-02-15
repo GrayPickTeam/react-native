@@ -104,3 +104,17 @@ If you see "No script URL provided" error in Xcode:
 - Application ID: com.graypick
 - Debug keystore configured
 - Hermes JavaScript engine available
+
+## Work Log 규칙
+
+작업 시 반드시 `docs/work-logs/` 폴더에 작업 로그를 기록한다.
+
+### 파일명 규칙
+- 형식: `YYYY-MM-DD-<작업주제>.md` (예: `2026-02-15-firebase-push-setup.md`)
+
+### 로그 포함 내용
+1. **작업 목표**: 무엇을 하려는지
+2. **진행 단계**: 각 단계별 수행 내용과 결과
+3. **변경된 파일 목록**: 수정/생성/삭제된 파일
+4. **이슈 및 해결**: 발생한 문제와 해결 방법
+5. **다음 할 일**: 후속 작업이 있다면 기록
