@@ -1,5 +1,5 @@
 import messaging from '@react-native-firebase/messaging';
-import {Alert, Platform} from 'react-native';
+import {Alert, Platform, PermissionsAndroid} from 'react-native';
 
 const TOPIC_LAW_UPDATES = 'law-updates';
 
@@ -8,16 +8,47 @@ const TOPIC_LAW_UPDATES = 'law-updates';
  */
 export async function initializePushNotification(): Promise<void> {
   try {
-    // Android 13+ (API 33) POST_NOTIFICATIONS 권한 요청
-    if (Platform.OS === 'android' && Platform.Version >= 33) {
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+    // Android 권한 요청
+    if (Platform.OS === 'android') {
+      // Android 13+ (API 33): POST_NOTIFICATIONS 런타임 권한 필요
+      if (Number(Platform.Version) >= 33) {
+        // 1단계: 현재 권한 상태 확인
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        );
 
-      if (!enabled) {
-        console.log('[FCM] 알림 권한이 거부되었습니다.');
-        return;
+        if (hasPermission) {
+          console.log('[FCM] 알림 권한이 이미 허용되어 있습니다');
+        } else {
+          // 2단계: 권한이 없으면 요청
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          );
+
+          if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('[FCM] 알림 권한이 허용되었습니다');
+          } else if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+            // "다시 묻지 않음" 선택 → 완전 포기
+            console.log('[FCM] 사용자가 "다시 묻지 않음"을 선택했습니다');
+            return;
+          } else {
+            // DENIED (일반 거부) → 다음 실행 시 다시 요청
+            console.log('[FCM] 알림 권한이 거부되었습니다 (다음 실행 시 재요청)');
+            return;
+          }
+        }
+      } else {
+        // Android 12 이하: Firebase 권한 확인
+        const authStatus = await messaging().requestPermission();
+        const enabled =
+          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+        if (!enabled) {
+          console.log('[FCM] 알림 권한이 거부되었습니다 (Android 12 이하)');
+          return;
+        }
+        console.log('[FCM] 알림 권한 허용됨 (Android 12 이하)');
       }
     }
 
@@ -29,9 +60,10 @@ export async function initializePushNotification(): Promise<void> {
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
       if (!enabled) {
-        console.log('[FCM] 알림 권한이 거부되었습니다.');
+        console.log('[FCM] 알림 권한이 거부되었습니다 (iOS)');
         return;
       }
+      console.log('[FCM] 알림 권한 허용됨 (iOS)');
     }
 
     // FCM 토큰 확인 (디버깅용)
